@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Apuração Presidente 2026 por Região</title>
+<style>
+/* Layout: faixa nacional no topo, grade de cartões por região (1 col no celular, 2-3 no desktop) */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --fg:#14201c; --muted:#5d6b66; --line:#dbe2df;
+  --lead:#0b6b4f; --lead-soft:#d6ebe3; --second:#8a6a12; --second-soft:#f1e7c8;
+  --track:#e6ebe9; --bad:#b3261e; --warn:#8a5a00;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1513; --surface:#17211e; --fg:#e8efec; --muted:#9aaaa4; --line:#2a3733;
+  --lead:#5fd0a8; --lead-soft:#1d3a31; --second:#e0bd5a; --second-soft:#3a321a;
+  --track:#25312d; --bad:#ff8a80; --warn:#f0c36a; color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);
+  padding:16px max(16px,env(safe-area-inset-right)) 32px max(16px,env(safe-area-inset-left))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;justify-content:space-between}
+h1{font-size:1.35rem;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:.85rem}
+.bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:.82rem;color:var(--muted)}
+button{font:inherit;font-weight:600;color:var(--fg);background:var(--surface);border:1px solid var(--line);
+  border-radius:8px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--lead);outline-offset:2px}
+button:disabled{opacity:.55;cursor:default}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lead);margin-right:6px}
+.dot.err{background:var(--bad)} .dot.load{background:var(--warn)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.br{border-color:var(--lead)}
+.card h2{margin:0;font-size:1.05rem}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ufs{color:var(--muted);font-size:.75rem}
+.urnas{display:flex;flex-direction:column;gap:4px}
+.urnas .row{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
+.urnas b{color:var(--fg);font-size:1rem;font-variant-numeric:tabular-nums}
+.track{height:8px;border-radius:4px;background:var(--track);overflow:hidden}
+.fill{height:100%;background:var(--lead);border-radius:4px;transition:width .5s}
+.cand{display:grid;grid-template-columns:46px 1fr;gap:10px;align-items:center}
+.photo{width:46px;height:58px;border-radius:8px;object-fit:cover;background:var(--track);display:block}
+.ini{width:46px;height:58px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:1.1rem;
+  background:var(--lead-soft);color:var(--lead)}
+.cand.c2 .ini{background:var(--second-soft);color:var(--second)}
+.info{min-width:0;display:flex;flex-direction:column;gap:3px}
+.nm{font-weight:700;overflow-wrap:anywhere;line-height:1.2}
+.pt{font-size:.78rem;color:var(--muted)}
+.pt span{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:0 6px;font-weight:600;color:var(--fg);margin-right:6px}
+.nums{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-variant-numeric:tabular-nums}
+.pct{font-size:1.3rem;font-weight:800;color:var(--lead)}
+.cand.c2 .pct{color:var(--second)}
+.votes{font-size:.8rem;color:var(--muted)}
+.cand .track{height:6px}
+.cand.c2 .fill{background:var(--second)}
+details{font-size:.8rem;color:var(--muted)}
+summary{cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-variant-numeric:tabular-nums}
+td,th{text-align:left;padding:3px 4px;border-top:1px solid var(--line)}
+td.r,th.r{text-align:right}
+.note{font-size:.78rem;color:var(--muted)}
+.alert{border:1px solid var(--bad);color:var(--bad);border-radius:10px;padding:12px;background:var(--surface);font-size:.88rem}
+.empty{color:var(--muted);font-size:.85rem}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Apuração para Presidente 2026 por Região</h1>
+      <div class="sub" id="hist">1º turno · dados oficiais do TSE lidos direto pelo seu navegador</div>
+    </div>
+    <div class="bar">
+      <span id="status"><span class="dot load"></span>Carregando…</span>
+      <span id="next"></span>
+      <button id="refresh" type="button">Atualizar agora</button>
+    </div>
+  </header>
+  <div id="alert" class="alert" hidden></div>
+  <div id="grid" class="grid"></div>
+  <div class="note">
+    Percentual do candidato = votos dele ÷ votos válidos já totalizados na região (soma dos estados).
+    Urnas apuradas = seções totalizadas ÷ total de seções. O cartão Brasil é a soma dos estados (mais o exterior, quando disponível).
+    Consulta automática ao TSE a cada 1 minuto enquanto esta página estiver aberta. Fonte: resultados.tse.jus.br.
+  </div>
+</div>
+<script>
+"use strict";
+/* ===== Configuração (ajuste aqui se o TSE mudar o caminho) ===== */
+const CFG = {
+  base: "https://resultados.tse.jus.br/oficial/ele2026",
+  eleicao: "6257",        // 1º turno federal 2026 (2º turno: 6258)
+  cargo: "0001",          // presidente
+  refreshMs: 60 * 1000
+};
+const REGIOES = [
+  ["Norte",        ["ac","ap","am","pa","ro","rr","to"]],
+  ["Nordeste",     ["al","ba","ce","ma","pb","pe","pi","rn","se"]],
+  ["Centro-Oeste", ["df","go","mt","ms"]],
+  ["Sudeste",      ["es","mg","rj","sp"]],
+  ["Sul",          ["pr","rs","sc"]]
+];
+const elePad = CFG.eleicao.padStart(6, "0");
+const urlDados = uf => `${CFG.base}/${CFG.eleicao}/dados/${uf}/${uf}-c${CFG.cargo}-e${elePad}-u.json`;
+const urlFoto  = (sq, ext) => `${CFG.base}/${CFG.eleicao}/fotos/br/${sq}.${ext}`;
+
+/* ===== Leitura tolerante do JSON do TSE ===== */
+function num(v){
+  if (typeof v === "number") return v;
+  if (v == null) return 0;
+  let s = String(v).trim();
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+function fixNome(s){
+  return String(s || "").replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d)).replace(/&amp;/g, "&");
+}
+// Percorre a árvore e coleta todo objeto que tenha votos (vap) e nome; guarda a sigla do partido mais próximo.
+function candidatos(node, sg, out){
+  if (Array.isArray(node)) { node.forEach(x => candidatos(x, sg, out)); return out; }
+  if (!node || typeof node !== "object") return out;
+  if (typeof node.sg === "string" && node.sg) sg = node.sg;
+  if ("vap" in node && (node.nmu || node.nm)) {
+    out.push({
+      id: String(node.sqcand || node.n || node.nmu || node.nm),
+      sq: node.sqcand ? String(node.sqcand) : "",
+      nome: fixNome(node.nmu || node.nm), num: node.n ? String(node.n) : "",
+      partido: sg || "", votos: num(node.vap)
+    });
+    return out;
+  }
+  for (const k in node) if (node[k] && typeof node[k] === "object") candidatos(node[k], sg, out);
+  return out;
+}
+function parse(j){
+  const s = j.s || {};
+  return { cands: candidatos(j.carg || j, "", []), ts: num(s.ts), st: num(s.st),
+           hora: [j.dg, j.hg].filter(Boolean).join(" ") };
+}
+async function baixar(uf){
+  const r = await fetch(urlDados(uf), { cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return parse(await r.json());
+}
+function somar(lista){
+  const m = new Map(); let ts = 0, st = 0;
+  for (const d of lista) {
+    ts += d.ts; st += d.st;
+    for (const c of d.cands) {
+      const a = m.get(c.id);
+      if (a) a.votos += c.votos; else m.set(c.id, { ...c });
+    }
+  }
+  const cands = [...m.values()].sort((a, b) => b.votos - a.votos);
+  const validos = cands.reduce((t, c) => t + c.votos, 0);
+  return { cands, validos, ts, st };
+}
+
+/* ===== Renderização ===== */
+const fInt = new Intl.NumberFormat("pt-BR");
+const fPct = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const pct = (a, b) => b > 0 ? a / b * 100 : 0;
+const iniciais = n => n.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase();
+
+function candHtml(c, validos, i){
+  const p = pct(c.votos, validos);
+  const foto = c.sq
+    ? `<img class="photo" alt="Foto de ${esc(c.nome)}" src="${esc(urlFoto(c.sq, "jpeg"))}" data-sq="${esc(c.sq)}" data-ini="${esc(iniciais(c.nome))}">`
+    : `<div class="ini">${esc(iniciais(c.nome))}</div>`;
+  return `<div class="cand c${i + 1}">${foto}<div class="info">
+    <div class="nm">${esc(c.nome)}</div>
+    <div class="pt">${c.partido ? `<span>${esc(c.partido)}</span>` : ""}${c.num ? "nº " + esc(c.num) : ""}</div>
+    <div class="nums"><span class="pct">${fPct.format(p)}%</span><span class="votes">${fInt.format(c.votos)} votos</span></div>
+    <div class="track"><div class="fill" style="width:${Math.min(100, p).toFixed(2)}%"></div></div>
+  </div></div>`;
+}
+function cardHtml(titulo, ag, sub, extra, cls){
+  const pu = pct(ag.st, ag.ts);
+  const top = ag.cands.slice(0, 2);
+  return `<section class="card ${cls || ""}">
+    <div class="head"><h2>${esc(titulo)}</h2><span class="ufs">${esc(sub)}</span></div>
+    <div class="urnas">
+      <div class="row"><span>Urnas apuradas</span><b>${ag.ts ? fPct.format(pu) + "%" : "—"}</b></div>
+      <div class="track"><div class="fill" style="width:${Math.min(100, pu).toFixed(2)}%"></div></div>
+      <div class="row"><span>${ag.ts ? fInt.format(ag.st) + " de " + fInt.format(ag.ts) + " seções" : "Sem dados de seções"}</span></div>
+    </div>
+    ${top.length && ag.validos > 0 ? top.map((c, i) => candHtml(c, ag.validos, i)).join("")
+      : `<div class="empty">Ainda sem votos totalizados.</div>`}
+    ${extra || ""}
+  </section>`;
+}
+function tabelaUfs(ufs, dados){
+  const linhas = ufs.map(uf => {
+    const d = dados[uf];
+    if (!d) return `<tr><td>${uf.toUpperCase()}</td><td class="r">—</td><td>falha ao carregar</td></tr>`;
+    const ag = somar([d]); const l = ag.cands[0];
+    return `<tr><td>${uf.toUpperCase()}</td><td class="r">${fPct.format(pct(d.st, d.ts))}%</td>
+      <td>${l && ag.validos ? esc(l.nome) + " " + fPct.format(pct(l.votos, ag.validos)) + "%" : "—"}</td></tr>`;
+  }).join("");
+  return `<details><summary>Por estado</summary><table><thead><tr><th>UF</th><th class="r">Urnas</th><th>Líder</th></tr></thead><tbody>${linhas}</tbody></table></details>`;
+}
+// Foto: tenta .jpeg, depois .jpg, depois iniciais.
+document.addEventListener("error", e => {
+  const im = e.target;
+  if (!(im instanceof HTMLImageElement) || !im.dataset.sq) return;
+  if (!im.dataset.t) { im.dataset.t = "1"; im.src = urlFoto(im.dataset.sq, "jpg"); return; }
+  const d = document.createElement("div"); d.className = "ini"; d.textContent = im.dataset.ini || "?";
+  im.replaceWith(d);
+}, true);
+
+/* ===== Ciclo de atualização ===== */
+const $ = id => document.getElementById(id);
+let proxima = 0, ocupado = false;
+const hist = [];
+function seg(h){ const m = /(\d\d):(\d\d):(\d\d)\s*$/.exec(h); return m ? m[1]*3600 + m[2]*60 + +m[3] : null; }
+function registrar(hora){
+  if (!hora || (hist.length && hist[hist.length-1] === hora)) return;
+  hist.push(hora); if (hist.length > 7) hist.shift();
+  $("hist").textContent = "1º turno · publicações do TSE vistas: " + hist.map((h, i) => {
+    const t = h.split(" ").pop(); const a = i ? seg(hist[i-1]) : null, b = seg(h);
+    return t + (a != null && b != null ? " (+" + Math.round((b - a) / 60) + " min)" : "");
+  }).join(" · ");
+}
+async function atualizar(){
+  if (ocupado) return; ocupado = true;
+  $("refresh").disabled = true;
+  $("status").innerHTML = `<span class="dot load"></span>Atualizando…`;
+  const ufs = REGIOES.flatMap(r => r[1]);
+  const res = await Promise.allSettled(["zz", ...ufs].map(baixar));
+  const dados = {}; const falhas = [];
+  ["zz", ...ufs].forEach((uf, i) => {
+    if (res[i].status === "fulfilled") dados[uf] = res[i].value; else if (uf !== "zz") falhas.push(uf.toUpperCase());
+  });
+  const ok = ufs.filter(u => dados[u]).length;
+  const chave = h => { const m = /(\d\d)\/(\d\d)\/(\d{4})\s+(\d\d:\d\d:\d\d)/.exec(h || ""); return m ? m[3] + m[2] + m[1] + m[4] : ""; };
+  const horaMax = Object.values(dados).map(d => d.hora).sort((a, b) => chave(a) < chave(b) ? -1 : 1).pop() || "";
+  if (ok === 0) {
+    $("alert").hidden = false;
+    $("alert").innerHTML = `Não consegui ler os dados do TSE (${esc(String(res[0].reason && res[0].reason.message || res[0].reason))}).
+      Abra este arquivo num navegador comum (Chrome, Safari, Edge) com internet; a pré-visualização dentro de apps costuma bloquear o acesso.
+      Nova tentativa automática em 1 minuto.`;
+    $("status").innerHTML = `<span class="dot err"></span>Sem dados`;
+  } else {
+    $("alert").hidden = falhas.length === 0;
+    if (falhas.length) $("alert").textContent = "Não carregou: " + falhas.join(", ") + ". Os totais regionais abaixo consideram só os estados carregados.";
+    let html = "";
+    html += cardHtml("Brasil", somar(Object.values(dados)), dados.zz ? "estados + exterior" : "soma dos estados", "", "br");
+    for (const [nome, lista] of REGIOES) {
+      const tem = lista.filter(u => dados[u]);
+      html += cardHtml(nome, somar(tem.map(u => dados[u])),
+        tem.length === lista.length ? lista.join(" ").toUpperCase() : `${tem.length} de ${lista.length} estados`,
+        tabelaUfs(lista, dados));
+    }
+    $("grid").innerHTML = html;
+    registrar(horaMax);
+    const horaTse = horaMax ? ` · TSE gerou em ${esc(horaMax)}` : "";
+    $("status").innerHTML = `<span class="dot${falhas.length ? " load" : ""}"></span>Atualizado às ${new Date().toLocaleTimeString("pt-BR")}${horaTse}`;
+  }
+  proxima = Date.now() + CFG.refreshMs;
+  $("refresh").disabled = false; ocupado = false;
+}
+setInterval(() => {
+  if (!proxima) return;
+  const s = Math.max(0, Math.round((proxima - Date.now()) / 1000));
+  $("next").textContent = `Próxima em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  if (s === 0 && !ocupado) atualizar();
+}, 1000);
+$("refresh").addEventListener("click", atualizar);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && proxima && Date.now() > proxima) atualizar(); });
+atualizar();
+</script>
+</body>
+</html>
