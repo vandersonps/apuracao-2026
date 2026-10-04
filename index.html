@@ -32,8 +32,8 @@ button:disabled{opacity:.55;cursor:default}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--lead);margin-right:6px}
 .dot.err{background:var(--bad)} .dot.load{background:var(--warn)}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
-  display:flex;flex-direction:column;gap:8px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;
+  display:flex;flex-direction:column;gap:6px;min-width:0}
 .card.br{border-color:var(--lead)}
 .card h2{margin:0;font-size:1.05rem}
 .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -85,6 +85,7 @@ td.r,th.r{text-align:right}
   </header>
   <div id="alert" class="alert" hidden></div>
   <div id="grid" class="grid"></div>
+  <div id="status2" class="sub"></div>
   <div class="note">
     Percentual do candidato = votos dele ÷ votos válidos já totalizados na região (soma dos estados).
     Urnas apuradas = seções totalizadas ÷ total de seções. O cartão Brasil é a soma dos estados (mais o exterior, quando disponível).
@@ -224,7 +225,7 @@ const hist = [];
 function seg(h){ const m = /(\d\d):(\d\d):(\d\d)\s*$/.exec(h); return m ? m[1]*3600 + m[2]*60 + +m[3] : null; }
 function registrar(hora){
   if (!hora || (hist.length && hist[hist.length-1] === hora)) return;
-  hist.push(hora); if (hist.length > 7) hist.shift();
+  hist.push(hora); if (hist.length > 4) hist.shift();
   $("hist").textContent = "1º turno · publicações do TSE vistas: " + hist.map((h, i) => {
     const t = h.split(" ").pop(); const a = i ? seg(hist[i-1]) : null, b = seg(h);
     return t + (a != null && b != null ? " (+" + Math.round((b - a) / 60) + " min)" : "");
@@ -264,6 +265,7 @@ async function atualizar(){
     registrar(horaMax);
     const horaTse = horaMax ? ` · TSE gerou em ${esc(horaMax)}` : "";
     $("status").innerHTML = `<span class="dot${falhas.length ? " load" : ""}"></span>Atualizado às ${new Date().toLocaleTimeString("pt-BR")}${horaTse}`;
+    $("status2").textContent = $("status").textContent;
   }
   proxima = Date.now() + CFG.refreshMs;
   $("refresh").disabled = false; ocupado = false;
