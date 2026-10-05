@@ -44,6 +44,11 @@ button:disabled{opacity:.55;cursor:default}
 .mapa.nac path{stroke-width:.5;stroke-opacity:.55}
 .mapa.nac path.reg{fill:none;stroke:var(--fg);stroke-opacity:.75;stroke-width:1.1;pointer-events:none}
 .rot.regn{display:none}
+.nac svg{overflow:visible}
+.nac .rg{transition:transform .22s ease,opacity .22s ease;transform-box:fill-box;transform-origin:center}
+.nac svg.tem .rg{opacity:.4}
+.nac svg.tem .rg.ativo{opacity:1;transform:scale(1.07);filter:drop-shadow(0 3px 7px rgba(0,0,0,.4))}
+@media (prefers-reduced-motion:reduce){.nac .rg{transition:none}.nac svg.tem .rg.ativo{transform:none}}
 .mapa line{stroke:var(--muted);stroke-width:1;vector-effect:non-scaling-stroke}
 .rot{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none;font-size:12px;line-height:1.1;text-align:center;
   color:#fff;text-shadow:0 0 2px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.6)}
@@ -62,6 +67,7 @@ button:disabled{opacity:.55;cursor:default}
 .chip.ap{background:var(--track);color:var(--muted)}
 .gl{display:grid;grid-template-columns:28px auto 1fr;gap:8px;align-items:center;font-size:.82rem;padding:5px 0;border-top:1px solid var(--line);cursor:pointer}
 .gl span{min-width:0;overflow-wrap:anywhere}
+.sec + .gl{border-top:0;padding-top:0}
 .turnos{display:inline-flex}
 .turnos button{border-radius:0;padding:7px 10px;font-weight:600;color:var(--muted)}
 .turnos button:first-child{border-radius:8px 0 0 8px}
@@ -296,15 +302,15 @@ function legendaTons(nomes, outro, semDado){
 const NOTA_TONS = `Cor mais escura = vantagem maior do líder (até ${FAIXAS[0]} · ${FAIXAS[0]} a ${FAIXAS[1]} · mais de ${FAIXAS[1]} p.p.)`;
 function brasilMapaHtml(dados){
   let formas = "", outro = false, sem = false; const nomes = {}, resumo = [];
-  for (const [reg, lista] of REGIOES) for (const uf of lista) {
+  for (const [reg, lista] of REGIOES) { formas += `<g class="rg" data-nome="${esc(reg)}">`; for (const uf of lista) {
     const m = MAPA[uf], r = lider(dados[uf]);
     if (r) { if (TONS[r.l.num]) nomes[r.l.num] = r.l.nome; else outro = true; } else sem = true;
     const dica = NOMES[uf] + ": " + (r ? `${r.l.nome} ${fPct.format(r.p)}%, vantagem de ${fPct.format(r.mg)} p.p.` : "sem dados");
     resumo.push(dica);
     formas += `<path d="${m.d}" fill="${r ? r.cor : "var(--semdado)"}" data-reg="${slug(reg)}" data-uf="${uf}"><title>${esc(dica)}</title></path>`;
-  }
+  } formas += `<path class="reg" d="${REGS[slug(reg)]}"/></g>`; }
   return `<section class="card mapa nac"><div class="head"><h2>Mapa do Brasil</h2><span class="ufs">toque num estado para abrir</span></div>
-    <div class="mapbox" style="--ar:0.96"><svg viewBox="0 0 613 639" role="img" aria-label="${esc(resumo.join("; "))}">${formas}${REGIOES.map(r => `<path class="reg" d="${REGS[slug(r[0])]}"/>`).join("")}</svg>${REGIOES.map(r => { const c = REGS_C[slug(r[0])]; return `<span class="rot regn" style="left:${(c[0] / 613 * 100).toFixed(2)}%;top:${(c[1] / 639 * 100).toFixed(2)}%">${esc(r[0])}</span>`; }).join("")}</div>
+    <div class="mapbox" style="--ar:0.96"><svg viewBox="0 0 613 639" role="img" aria-label="${esc(resumo.join("; "))}">${formas}</svg>${REGIOES.map(r => { const c = REGS_C[slug(r[0])]; return `<span class="rot regn" style="left:${(c[0] / 613 * 100).toFixed(2)}%;top:${(c[1] / 639 * 100).toFixed(2)}%">${esc(r[0])}</span>`; }).join("")}</div>
     <div class="legenda">${legendaTons(nomes, outro, sem)}</div><div class="margem">${NOTA_TONS}</div></section>`;
 }
 const FORA = { rn: -3, pb: -1, pe: 0.5, al: 2.5, se: 6, es: 0, rj: 5, df: 0 };   // estados pequenos: rótulo fora, à direita (deslocamento vertical, % da altura)
@@ -394,21 +400,20 @@ function resumoGovHtml(lista){
     else if (g && g.erro) chip = ["ap", "Não carregou"];
     return `<div class="gl" data-uf="${uf}"><b>${uf.toUpperCase()}</b><em class="chip ${chip[0]}">${chip[1]}</em><span>${esc(txt)}</span></div>`;
   }).join("");
-  return `<section class="card"><div class="head"><h2>Governadores</h2><span class="ufs">toque para ver o estado</span></div>${linhas}</section>`;
+  return `<div class="sec"><div>Governadores</div><span>toque para ver o estado</span></div>${linhas}`;
 }
 function desenhar(){
   const dados = ultimos; if (!dados) return;
   const f = foco(); let html = "";
-  const regiao = ([nome, lista], extra, cls) => {
+  const regiao = ([nome, lista], extra, cls, secao) => {
     const tem = lista.filter(u => dados[u]);
     return cardHtml(nome, somar(tem.map(u => dados[u])),
-      tem.length === lista.length ? lista.join(" ").toUpperCase() : `${tem.length} de ${lista.length} estados`, extra, cls);
+      tem.length === lista.length ? lista.join(" ").toUpperCase() : `${tem.length} de ${lista.length} estados`, extra, cls, "", secao);
   };
   if (f) {
     html += `<button type="button" class="voltar" data-voltar="1">‹ Todas as regiões</button>`;
-    html += regiao(f, "", "br");
+    html += regiao(f, resumoGovHtml(f[1]), "br", true);
     html += mapaHtml(f[1], dados);
-    html += resumoGovHtml(f[1]);
     for (const uf of f[1]) {
       html += dados[uf] ? cardHtml(NOMES[uf], somar([dados[uf]]), uf.toUpperCase(), govHtml(uf), "", "uf-" + uf, true)
         : `<section class="card" id="uf-${uf}"><div class="head"><h2>${esc(NOMES[uf])}</h2><span class="ufs">${uf.toUpperCase()}</span></div><div class="empty">Não carregou nesta atualização.</div></section>`;
@@ -427,12 +432,31 @@ function focarUf(){
   el.scrollIntoView({ block: "start", behavior: "smooth" });
   el.classList.add("foco"); setTimeout(() => el.classList.remove("foco"), 2500);
 }
+const comMouse = () => matchMedia("(hover:hover)").matches;
+function destacarReg(g){
+  const svg = document.querySelector(".nac svg"); if (!svg) return;
+  svg.querySelectorAll(".rg.ativo").forEach(x => x.classList.remove("ativo"));
+  const dica = document.querySelector(".nac .ufs");
+  if (g) { svg.appendChild(g); g.classList.add("ativo"); svg.classList.add("tem"); if (dica) dica.textContent = g.dataset.nome + (comMouse() ? " · clique para abrir" : ""); }
+  else { svg.classList.remove("tem"); if (dica) dica.textContent = "toque num estado para abrir"; }
+}
+document.addEventListener("mouseover", e => {
+  if (!comMouse()) return;
+  const g = e.target.closest ? e.target.closest(".nac .rg") : null;
+  if (g) { if (!g.classList.contains("ativo")) destacarReg(g); }
+  else if (document.querySelector(".nac .rg.ativo")) destacarReg(null);
+});
+function navegar(reg, uf){
+  alvoUf = uf || null;
+  if (reg && location.hash.slice(1) !== reg) { location.hash = reg; if (!alvoUf) window.scrollTo(0, 0); }
+  else focarUf();
+}
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-reg],[data-uf],[data-voltar]"); if (!b) return;
   if (b.dataset.voltar) { history.replaceState(null, "", location.pathname + location.search); desenhar(); window.scrollTo(0, 0); return; }
-  alvoUf = b.dataset.uf || null;
-  if (b.dataset.reg && location.hash.slice(1) !== b.dataset.reg) { location.hash = b.dataset.reg; if (!alvoUf) window.scrollTo(0, 0); }
-  else focarUf();
+  const g = b.closest(".nac .rg");
+  if (g && !comMouse()) { destacarReg(g); setTimeout(() => navegar(b.dataset.reg, b.dataset.uf), 420); return; }   // no toque: destaca a região e só então abre
+  navegar(b.dataset.reg, b.dataset.uf);
 });
 window.addEventListener("hashchange", () => { desenhar(); if (alvoUf) setTimeout(focarUf, 60); });
 const hist = [];
