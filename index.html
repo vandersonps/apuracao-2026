@@ -35,6 +35,8 @@ button:disabled{opacity:.55;cursor:default}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;
   display:flex;flex-direction:column;gap:6px;min-width:0}
 .card.br{border-color:var(--lead)}
+.drill{align-self:flex-start;font-size:.8rem;padding:5px 10px;color:var(--lead);border-color:var(--lead)}
+.voltar{grid-column:1/-1;justify-self:start}
 .card h2{margin:0;font-size:1.05rem}
 .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .ufs{color:var(--muted);font-size:.75rem}
@@ -88,7 +90,7 @@ td.r,th.r{text-align:right}
   <div id="status2" class="sub"></div>
   <div class="note">
     Percentual do candidato = votos dele ÷ votos válidos já totalizados na região (soma dos estados).
-    Urnas apuradas = seções totalizadas ÷ total de seções. O cartão Brasil é a soma dos estados (mais o exterior, quando disponível).
+    Urnas apuradas = seções totalizadas ÷ total de seções. Toque em “Ver estados” para abrir uma região. O cartão Brasil é a soma dos estados (mais o exterior, quando disponível).
     Consulta automática ao TSE a cada 1 minuto enquanto esta página estiver aberta. Fonte: resultados.tse.jus.br.
   </div>
 </div>
@@ -220,7 +222,38 @@ document.addEventListener("error", e => {
 
 /* ===== Ciclo de atualização ===== */
 const $ = id => document.getElementById(id);
-let proxima = 0, ocupado = false;
+let proxima = 0, ocupado = false, ultimos = null;
+const NOMES = {ac:"Acre",ap:"Amapá",am:"Amazonas",pa:"Pará",ro:"Rondônia",rr:"Roraima",to:"Tocantins",al:"Alagoas",ba:"Bahia",ce:"Ceará",ma:"Maranhão",pb:"Paraíba",pe:"Pernambuco",pi:"Piauí",rn:"Rio Grande do Norte",se:"Sergipe",df:"Distrito Federal",go:"Goiás",mt:"Mato Grosso",ms:"Mato Grosso do Sul",es:"Espírito Santo",mg:"Minas Gerais",rj:"Rio de Janeiro",sp:"São Paulo",pr:"Paraná",rs:"Rio Grande do Sul",sc:"Santa Catarina"};
+const slug = n => n.toLowerCase().normalize("NFD").replace(/[^a-z-]/g, "");
+const foco = () => REGIOES.find(r => slug(r[0]) === location.hash.slice(1)) || null;
+function desenhar(){
+  const dados = ultimos; if (!dados) return;
+  const f = foco(); let html = "";
+  const regiao = ([nome, lista], extra, cls) => {
+    const tem = lista.filter(u => dados[u]);
+    return cardHtml(nome, somar(tem.map(u => dados[u])),
+      tem.length === lista.length ? lista.join(" ").toUpperCase() : `${tem.length} de ${lista.length} estados`, extra, cls);
+  };
+  if (f) {
+    html += `<button type="button" class="voltar" data-voltar="1">‹ Todas as regiões</button>`;
+    html += regiao(f, "", "br");
+    for (const uf of f[1]) {
+      html += dados[uf] ? cardHtml(NOMES[uf], somar([dados[uf]]), uf.toUpperCase(), "")
+        : `<section class="card"><div class="head"><h2>${esc(NOMES[uf])}</h2><span class="ufs">${uf.toUpperCase()}</span></div><div class="empty">Não carregou nesta atualização.</div></section>`;
+    }
+  } else {
+    html += cardHtml("Brasil", somar(Object.values(dados)), dados.zz ? "estados + exterior" : "soma dos estados", "", "br");
+    for (const r of REGIOES) html += regiao(r, `<button type="button" class="drill" data-reg="${slug(r[0])}">Ver estados ›</button>`);
+  }
+  $("grid").innerHTML = html;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-reg],[data-voltar]"); if (!b) return;
+  if (b.dataset.reg) location.hash = b.dataset.reg;
+  else history.replaceState(null, "", location.pathname + location.search), desenhar();
+  window.scrollTo(0, 0);
+});
+window.addEventListener("hashchange", desenhar);
 const hist = [];
 function seg(h){ const m = /(\d\d):(\d\d):(\d\d)\s*$/.exec(h); return m ? m[1]*3600 + m[2]*60 + +m[3] : null; }
 function registrar(hora){
@@ -253,15 +286,7 @@ async function atualizar(){
   } else {
     $("alert").hidden = falhas.length === 0;
     if (falhas.length) $("alert").textContent = "Não carregou: " + falhas.join(", ") + ". Os totais regionais abaixo consideram só os estados carregados.";
-    let html = "";
-    html += cardHtml("Brasil", somar(Object.values(dados)), dados.zz ? "estados + exterior" : "soma dos estados", "", "br");
-    for (const [nome, lista] of REGIOES) {
-      const tem = lista.filter(u => dados[u]);
-      html += cardHtml(nome, somar(tem.map(u => dados[u])),
-        tem.length === lista.length ? lista.join(" ").toUpperCase() : `${tem.length} de ${lista.length} estados`,
-        tabelaUfs(lista, dados));
-    }
-    $("grid").innerHTML = html;
+    ultimos = dados; desenhar();
     registrar(horaMax);
     const horaTse = horaMax ? ` · TSE gerou em ${esc(horaMax)}` : "";
     $("status").innerHTML = `<span class="dot${falhas.length ? " load" : ""}"></span>Atualizado às ${new Date().toLocaleTimeString("pt-BR")}${horaTse}`;
