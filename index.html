@@ -309,7 +309,7 @@ function brasilMapaHtml(dados){
     resumo.push(dica);
     formas += `<path d="${m.d}" fill="${r ? r.cor : "var(--semdado)"}" data-reg="${slug(reg)}" data-uf="${uf}"><title>${esc(dica)}</title></path>`;
   } formas += `<path class="reg" d="${REGS[slug(reg)]}"/></g>`; }
-  return `<section class="card mapa nac"><div class="head"><h2>Mapa do Brasil</h2><span class="ufs">toque num estado para abrir</span></div>
+  return `<section class="card mapa nac"><div class="head"><h2>Mapa do Brasil</h2><span class="ufs">toque numa região para abrir</span></div>
     <div class="mapbox" style="--ar:0.96"><svg viewBox="0 0 613 639" role="img" aria-label="${esc(resumo.join("; "))}">${formas}</svg>${REGIOES.map(r => { const c = REGS_C[slug(r[0])]; return `<span class="rot regn" style="left:${(c[0] / 613 * 100).toFixed(2)}%;top:${(c[1] / 639 * 100).toFixed(2)}%">${esc(r[0])}</span>`; }).join("")}</div>
     <div class="legenda">${legendaTons(nomes, outro, sem)}</div><div class="margem">${NOTA_TONS}</div></section>`;
 }
@@ -412,8 +412,8 @@ function desenhar(){
   };
   if (f) {
     html += `<button type="button" class="voltar" data-voltar="1">‹ Todas as regiões</button>`;
-    html += regiao(f, resumoGovHtml(f[1]), "br", true);
     html += mapaHtml(f[1], dados);
+    html += regiao(f, resumoGovHtml(f[1]), "br", true);
     for (const uf of f[1]) {
       html += dados[uf] ? cardHtml(NOMES[uf], somar([dados[uf]]), uf.toUpperCase(), govHtml(uf), "", "uf-" + uf, true)
         : `<section class="card" id="uf-${uf}"><div class="head"><h2>${esc(NOMES[uf])}</h2><span class="ufs">${uf.toUpperCase()}</span></div><div class="empty">Não carregou nesta atualização.</div></section>`;
@@ -438,7 +438,7 @@ function destacarReg(g){
   svg.querySelectorAll(".rg.ativo").forEach(x => x.classList.remove("ativo"));
   const dica = document.querySelector(".nac .ufs");
   if (g) { svg.appendChild(g); g.classList.add("ativo"); svg.classList.add("tem"); if (dica) dica.textContent = g.dataset.nome + (comMouse() ? " · clique para abrir" : ""); }
-  else { svg.classList.remove("tem"); if (dica) dica.textContent = "toque num estado para abrir"; }
+  else { svg.classList.remove("tem"); if (dica) dica.textContent = "toque numa região para abrir"; }
 }
 document.addEventListener("mouseover", e => {
   if (!comMouse()) return;
@@ -455,8 +455,8 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-reg],[data-uf],[data-voltar]"); if (!b) return;
   if (b.dataset.voltar) { history.replaceState(null, "", location.pathname + location.search); desenhar(); window.scrollTo(0, 0); return; }
   const g = b.closest(".nac .rg");
-  if (g && !comMouse()) { destacarReg(g); setTimeout(() => navegar(b.dataset.reg, b.dataset.uf), 420); return; }   // no toque: destaca a região e só então abre
-  navegar(b.dataset.reg, b.dataset.uf);
+  if (g && !comMouse()) { destacarReg(g); setTimeout(() => navegar(b.dataset.reg), 420); return; }   // no toque: destaca a região e só então abre
+  navegar(b.dataset.reg, g ? null : b.dataset.uf);   // no mapa do Brasil abre a região, não o estado
 });
 window.addEventListener("hashchange", () => { desenhar(); if (alvoUf) setTimeout(focarUf, 60); });
 const hist = [];
