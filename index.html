@@ -680,7 +680,10 @@ async function gerarImagem(alvo, nome){
     // fotos: entram como cópia embutida; se o TSE não liberar o uso (CORS), ficam as iniciais
     await Promise.all([...cx.querySelectorAll("img.photo")].map(async im => {
       const dado = im.src ? await fotoData(im.src) : "";
-      if (dado) { const n = document.createElement("img"); n.className = "photo"; n.alt = ""; await new Promise(r => { n.onload = n.onerror = r; n.src = dado; }); im.replaceWith(n); }
+      if (dado) {   // como fundo "cover": o gerador de imagem não respeita o recorte proporcional de <img> e achataria a foto
+        await new Promise(r => { const t = new Image(); t.onload = t.onerror = r; t.src = dado; });
+        const n = document.createElement("div"); n.className = "photo"; n.style.cssText = `background:url("${dado}") center/cover no-repeat`; im.replaceWith(n);
+      }
       else { const d = document.createElement("div"); d.className = "ini"; d.textContent = im.dataset.ini || "?"; im.replaceWith(d); }
     }));
     // mapas: fixa no próprio SVG as cores e traços que vêm do CSS (a imagem do SVG não enxerga a folha de estilos)
