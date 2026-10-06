@@ -40,15 +40,15 @@ button:disabled{opacity:.55;cursor:default}
 .voltar{grid-column:1/-1;justify-self:start}
 .mapbox{position:relative;width:min(100%,calc(400px * var(--ar)));aspect-ratio:var(--ar);margin-inline:auto}
 .mapbox svg{display:block;width:100%;height:100%}
-.mapa path{stroke:var(--surface);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round}
-.mapa.nac path{stroke-width:.5;stroke-opacity:.55}
-.mapa.nac path.reg{fill:none;stroke:var(--fg);stroke-opacity:.75;stroke-width:1.1;pointer-events:none}
+.mapa .mapbox path{stroke:var(--surface);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.mapa.nac .mapbox path{stroke-width:.5;stroke-opacity:.55}
+.mapa.nac .mapbox path.reg{fill:none;stroke:var(--fg);stroke-opacity:.75;stroke-width:1.1;pointer-events:none}
 .rot.regn{display:none}
-.nac svg{overflow:visible}
+.nac .mapbox svg{overflow:visible}
 .nac .rg{transition:transform .22s ease,opacity .22s ease;transform-box:fill-box;transform-origin:center}
-.nac svg.tem .rg{opacity:.4}
-.nac svg.tem .rg.ativo{opacity:1;transform:scale(1.07);filter:drop-shadow(0 3px 7px rgba(0,0,0,.4))}
-@media (prefers-reduced-motion:reduce){.nac .rg{transition:none}.nac svg.tem .rg.ativo{transform:none}}
+.nac .mapbox svg.tem .rg{opacity:.4}
+.nac .mapbox svg.tem .rg.ativo{opacity:1;transform:scale(1.07);filter:drop-shadow(0 3px 7px rgba(0,0,0,.4))}
+@media (prefers-reduced-motion:reduce){.nac .rg{transition:none}.nac .mapbox svg.tem .rg.ativo{transform:none}}
 .mapa line{stroke:var(--muted);stroke-width:1;vector-effect:non-scaling-stroke}
 .rot{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none;font-size:12px;line-height:1.1;text-align:center;
   color:#fff;text-shadow:0 0 2px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.6)}
@@ -56,7 +56,7 @@ button:disabled{opacity:.55;cursor:default}
 .rot b{font-weight:700}
 .rot span{font-size:11px;font-weight:500}
 @media (min-width:700px){.rot{font-size:13px}.rot span{font-size:12px}}
-.mapa path{cursor:pointer}
+.mapa .mapbox path{cursor:pointer}
 .card.foco{outline:2px solid var(--lead);outline-offset:2px}
 .rot.claro{color:var(--rot-claro);text-shadow:none}
 .sec{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-top:1px solid var(--line);padding-top:8px;margin-top:2px;font-size:.72rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
@@ -113,6 +113,25 @@ td.r,th.r{text-align:right}
 .empty{color:var(--muted);font-size:.85rem}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){.fill{transition:none}}
+
+.shr{border:0;background:none;color:var(--muted);padding:2px 0 2px 4px;margin:0;cursor:pointer;line-height:0;align-self:center;flex:none}
+.shr:hover{color:var(--fg)}
+.head .ufs{margin-left:auto;text-align:right}
+.part{font-size:.76rem;color:var(--muted)}
+.shot{position:fixed;left:-20000px;top:0;padding:16px;background:var(--bg);color:var(--fg);box-sizing:border-box}
+.shot *{font-variant-numeric:normal!important}
+.shot-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;font-size:.95rem}
+.shot-h span{color:var(--muted);font-size:.8rem;text-align:right}
+.shot-f{margin-top:10px;font-size:.7rem;color:var(--muted);line-height:1.5}
+#shot-modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+#shot-modal[hidden]{display:none}
+.shot-box{background:var(--surface);color:var(--fg);border-radius:12px;padding:14px;max-width:min(520px,100%);max-height:100%;display:flex;flex-direction:column;gap:10px}
+.shot-box img{max-width:100%;max-height:60vh;object-fit:contain;border:1px solid var(--line);border-radius:8px;align-self:center}
+.shot-bts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.shot-bts a,.shot-bts button{font:inherit;font-size:.85rem;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);text-decoration:none;cursor:pointer}
+.shot-bts a[hidden],.shot-bts button[hidden]{display:none}
+#shot-env{background:var(--lead);border-color:var(--lead);color:#fff}
+#shot-st{font-size:.85rem;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -126,6 +145,7 @@ td.r,th.r{text-align:right}
       <span id="status"><span class="dot load"></span>Carregando…</span>
       <span id="next"></span>
       <button id="refresh" type="button">Atualizar agora</button>
+      <button id="share" type="button">Compartilhar</button>
       <span class="turnos" role="group" aria-label="Turno"><button type="button" id="turno1" data-turno="1">1º turno</button><button type="button" id="turno2" data-turno="2">2º turno</button></span>
     </div>
   </header>
@@ -138,6 +158,10 @@ td.r,th.r{text-align:right}
     Consulta automática ao TSE a cada 2 minutos só durante a apuração: das 17h (Brasília) do dia da eleição até 100% das urnas. <span id="cal"></span> Fonte: resultados.tse.jus.br. Contornos do mapa: @svg-maps/brazil (CC BY 4.0).
   </div>
 </div>
+<div id="shot-modal" hidden><div class="shot-box" role="dialog" aria-label="Compartilhar imagem">
+  <div id="shot-st"></div><img id="shot-img" alt="Prévia da imagem" hidden>
+  <div class="shot-bts"><button type="button" id="shot-x">Fechar</button><a id="shot-bx" hidden>Baixar JPG</a><button type="button" id="shot-env" hidden>Enviar (WhatsApp…)</button></div>
+</div></div>
 <script>
 "use strict";
 /* ===== Configuração (ajuste aqui se o TSE mudar o caminho) ===== */
@@ -152,6 +176,7 @@ const CFG = {
   govMs: 5 * 60 * 1000,   // governadores: só da região aberta, renovados no máximo a cada 5 min
   refreshMs: 2 * 60 * 1000,   // intervalo normal entre consultas
   maxMs: 10 * 60 * 1000,      // teto do intervalo quando o TSE limita (HTTP 429)
+  h2c: "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",   // gerador de imagem, baixado só ao compartilhar
   paralelo: 3                 // consultas simultâneas ao TSE
 };
 const REGIOES = [
@@ -276,7 +301,6 @@ function mostrarCalendario(){
   if (location.hash === "#diag") {
     let pre = $("diag"); if (!pre) { pre = document.createElement("pre"); pre.id = "diag"; pre.style.cssText = "white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5;margin:12px 0;padding:12px;border:1px solid var(--line,#ccc);border-radius:8px;user-select:text;-webkit-user-select:text"; $("grid").before(pre); }
     pre.textContent = "Calendário do TSE (" + CFG.raiz + "/" + CFG.config + ")\n\n" + (EL.diag ? EL.diag.join("\n\n") : "não foi lido") + "\n\nEscolhido: ciclo " + EL.ciclo + " · presidente " + JSON.stringify(EL.fed) + " · governador " + JSON.stringify(EL.uf) + "\n\nGovernador em uso: 1ºT " + (EL.ufOk && EL.ufOk[1] || "ainda não consultado") + " · 2ºT " + (EL.ufOk && EL.ufOk[2] || "ainda não consultado");
-    if (EL.fonte === "tse" && !EL.semPres) diagMunicipios(pre);
   }
   const a = anoEl();
   $("titulo").textContent = `Apuração para Presidente ${a} por Região`; document.title = `Apuração Presidente ${a} por Região`;
@@ -316,8 +340,9 @@ function candidatos(node, sg, out){
   return out;
 }
 function parse(j){
-  const s = j.s || {};
+  const s = j.s || {}, e = j.e || {}, v = j.v || {};
   return { cands: candidatos(j.carg || j, "", []), ts: num(s.ts), st: num(s.st),
+           te: num(e.te), est: num(e.est), comp: num(e.c), abst: num(e.a), tv: num(v.tv), vb: num(v.vb), vnul: num(v.tvn),   // eleitorado, comparecimento, abstenção, brancos, nulos
            hora: [j.dg, j.hg].filter(Boolean).join(" ") };
 }
 async function baixar(uf){
@@ -327,9 +352,9 @@ async function baixar(uf){
   return parse(await r.json());
 }
 function somar(lista){
-  const m = new Map(); let ts = 0, st = 0;
+  const m = new Map(); let ts = 0, st = 0; const x = { te: 0, est: 0, comp: 0, abst: 0, tv: 0, vb: 0, vnul: 0 };
   for (const d of lista) {
-    ts += d.ts; st += d.st;
+    ts += d.ts; st += d.st; for (const k in x) x[k] += d[k] || 0;
     for (const c of d.cands) {
       const a = m.get(c.id);
       if (a) a.votos += c.votos; else m.set(c.id, { ...c });
@@ -337,7 +362,7 @@ function somar(lista){
   }
   const cands = [...m.values()].sort((a, b) => b.votos - a.votos);
   const validos = cands.reduce((t, c) => t + c.votos, 0);
-  return { cands, validos, ts, st };
+  return { cands, validos, ts, st, ...x };
 }
 
 /* ===== Renderização ===== */
@@ -365,6 +390,25 @@ function blocoCands(ag, fb, marcas){
   return (top.length && ag.validos > 0 ? top.map((c, i) => candHtml(c, ag.validos, i, fb, marcas && marcas[c.id])).join("") : `<div class="empty">Ainda sem votos totalizados.</div>`)
     + (top.length > 1 && ag.validos > 0 ? `<div class="margem">Vantagem: <b>${fPct.format(pct(top[0].votos - top[1].votos, ag.validos))} p.p.</b> · ${fInt.format(top[0].votos - top[1].votos)} votos</div>` : "");
 }
+const f1 = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const aprox = n => n >= 1e6 ? f1.format(n / 1e6) + (n < 2e6 ? " milhão" : " milhões") : n >= 1e3 ? fInt.format(Math.round(n / 1e3)) + " mil" : fInt.format(Math.round(n));
+// Comparecimento, abstenção, brancos e nulos (já vêm no arquivo do TSE)
+function participacaoHtml(ag){
+  if (!(ag.comp > 0) || !(ag.tv > 0)) return "";
+  const p = (a, b) => f1.format(pct(a, b)) + "%";
+  return `<div class="part">Comparecimento ${p(ag.comp, ag.comp + ag.abst)} · Abstenção ${p(ag.abst, ag.comp + ag.abst)} · Brancos ${p(ag.vb, ag.tv)} · Nulos ${p(ag.vnul, ag.tv)}</div>`;
+}
+// Durante a apuração: o que falta contar ainda permite ao 2º alcançar o líder?
+function faltaHtml(ag){
+  const top = ag.cands;
+  if (top.length < 2 || !(ag.validos > 0) || !(ag.ts > 0) || ag.st >= ag.ts || !(ag.te > ag.est)) return "";
+  const lider = top[0].votos - top[1].votos, eleit = ag.te - ag.est;
+  if (lider > eleit) return `<div class="margem"><b>Definido:</b> a vantagem é maior que os ${aprox(eleit)}${eleit >= 1e6 ? " de" : ""} eleitores das seções que faltam.</div>`;
+  if (!(ag.est > 0) || !(ag.tv > 0)) return "";
+  const resta = eleit * (ag.comp / ag.est) * (ag.validos / ag.tv); if (!(resta >= 1)) return "";
+  const precisa = (lider + resta) / (2 * resta);
+  return `<div class="margem">Faltam cerca de ${aprox(resta)}${resta >= 1e6 ? " de" : ""} votos válidos (estimativa) · ` + (precisa > 1 ? "nesse ritmo o 2º não alcança mais." : `o 2º precisa de <b>${f1.format(precisa * 100)}%</b> deles para virar.`) + `</div>`;
+}
 function cardHtml(titulo, ag, sub, extra, cls, id, secao){
   const pu = pct(ag.st, ag.ts);
   return `<section class="card ${cls || ""}"${id ? ` id="${id}"` : ""}>
@@ -373,9 +417,11 @@ function cardHtml(titulo, ag, sub, extra, cls, id, secao){
       <div class="row"><span>Urnas apuradas</span><b>${ag.ts ? fPct.format(pu) + "%" : "—"}</b></div>
       <div class="track"><div class="fill" style="width:${Math.min(100, pu).toFixed(2)}%"></div></div>
       <div class="row"><span>${ag.ts ? fInt.format(ag.st) + " de " + fInt.format(ag.ts) + " seções" : "Sem dados de seções"}</span></div>
+      ${participacaoHtml(ag)}
     </div>
     ${secao ? `<div class="sec">Presidente</div>` : ""}
     ${blocoCands(ag)}
+    ${faltaHtml(ag)}
     ${extra || ""}
   </section>`;
 }
@@ -559,7 +605,7 @@ function desenhar(){
     html += brasilMapaHtml(dados);
     for (const r of REGIOES) html += regiao(r, `<button type="button" class="drill" data-reg="${slug(r[0])}">Ver estados ›</button>`);
   }
-  $("grid").innerHTML = html;
+  $("grid").innerHTML = html; porBotoes();
   if (f) carregarGov(f[1]);
 }
 let alvoUf = null;
@@ -570,7 +616,7 @@ function focarUf(){
 }
 const comMouse = () => matchMedia("(hover:hover)").matches;
 function destacarReg(g){
-  const svg = document.querySelector(".nac svg"); if (!svg) return;
+  const svg = document.querySelector(".nac .mapbox svg"); if (!svg) return;
   svg.querySelectorAll(".rg.ativo").forEach(x => x.classList.remove("ativo"));
   const dica = document.querySelector(".nac .ufs");
   if (g) { svg.appendChild(g); g.classList.add("ativo"); svg.classList.add("tem"); if (dica) dica.textContent = g.dataset.nome + (comMouse() ? " · clique para abrir" : ""); }
@@ -595,6 +641,74 @@ document.addEventListener("click", e => {
   navegar(b.dataset.reg, g ? null : b.dataset.uf);   // no mapa do Brasil abre a região, não o estado
 });
 window.addEventListener("hashchange", () => { desenhar(); if (alvoUf) setTimeout(focarUf, 60); });
+/* ===== Compartilhar: gera um JPG do painel inteiro, de um mapa ou de um cartão ===== */
+const ICO_SHR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 15V4m0 0L8 8m4-4l4 4M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg>`;
+function porBotoes(){ document.querySelectorAll("#grid .card > .head").forEach(h => { if (!h.querySelector(".shr")) h.insertAdjacentHTML("beforeend", `<button type="button" class="shr" data-shr="1" title="Compartilhar este cartão" aria-label="Compartilhar este cartão">${ICO_SHR}</button>`); }); }
+let h2cP = null;
+function carregarH2C(){
+  if (window.html2canvas) return Promise.resolve();
+  return h2cP = h2cP || new Promise((ok, erro) => { const s = document.createElement("script"); s.src = CFG.h2c; s.onload = ok; s.onerror = () => { h2cP = null; erro(new Error("não consegui baixar o gerador de imagem")); }; document.head.appendChild(s); });
+}
+const corsCache = {};
+const corsOk = src => corsCache[src] = corsCache[src] || new Promise(r => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => r(true); i.onerror = () => r(false); i.src = src; setTimeout(() => r(false), 6000); });
+async function gerarImagem(alvo, nome){
+  await carregarH2C();
+  const cs = getComputedStyle(document.documentElement), bg = cs.getPropertyValue("--bg").trim() || "#fff";
+  const larg = Math.ceil(alvo.getBoundingClientRect().width);
+  const cx = document.createElement("div"); cx.className = "shot"; cx.style.width = (larg + 32) + "px";
+  const agora = new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  cx.innerHTML = `<div class="shot-h"><b>${esc($("titulo").textContent)}</b><span>${turno}º turno${nome ? " · " + esc(nome) : ""}</span></div><div class="shot-c"></div>
+    <div class="shot-f">${esc($("status2").textContent || "")}<br>Fonte: TSE (resultados.tse.jus.br) · imagem gerada em ${agora}</div>`;
+  const copia = alvo.cloneNode(true); copia.removeAttribute("id");
+  cx.querySelector(".shot-c").appendChild(copia); document.body.appendChild(cx);
+  try {
+    cx.querySelectorAll(".shr,.drill,.voltar,#diag").forEach(x => x.remove());
+    cx.querySelectorAll("[id]").forEach(x => x.removeAttribute("id"));
+    cx.querySelectorAll(".tem,.ativo,.foco").forEach(x => x.classList.remove("tem", "ativo", "foco"));
+    cx.querySelectorAll(".nac .ufs").forEach(x => { x.textContent = ""; });
+    cx.querySelectorAll(".sec span").forEach(x => { if (/toque/.test(x.textContent)) x.textContent = ""; });
+    // fotos: só entram se o TSE permitir o uso em imagem (CORS); senão ficam as iniciais
+    await Promise.all([...cx.querySelectorAll("img.photo")].map(async im => {
+      if (await corsOk(im.src)) { const n = im.cloneNode(); n.crossOrigin = "anonymous"; await new Promise(r => { n.onload = n.onerror = r; n.src = im.src; }); im.replaceWith(n); }
+      else { const d = document.createElement("div"); d.className = "ini"; d.textContent = im.dataset.ini || "?"; im.replaceWith(d); }
+    }));
+    // mapas: fixa no próprio SVG as cores e traços que vêm do CSS (a imagem do SVG não enxerga a folha de estilos)
+    cx.querySelectorAll("svg").forEach(svg => {
+      const r = svg.getBoundingClientRect(); svg.setAttribute("width", r.width); svg.setAttribute("height", r.height);
+      svg.querySelectorAll("path,g,circle,rect,line").forEach(el => { const c = getComputedStyle(el);
+        for (const p of ["fill", "stroke", "stroke-width", "stroke-opacity", "fill-opacity", "opacity", "stroke-linejoin"]) el.style.setProperty(p, c.getPropertyValue(p)); });
+    });
+    const r = cx.getBoundingClientRect(), escala = Math.max(0.5, Math.min(2, Math.sqrt(14e6 / (r.width * r.height))));
+    const canvas = await html2canvas(cx, { scale: escala, useCORS: true, backgroundColor: bg, logging: false, windowWidth: document.documentElement.clientWidth });
+    return await new Promise((ok, erro) => canvas.toBlob(b => b ? ok(b) : erro(new Error("o navegador não gerou a imagem")), "image/jpeg", 0.92));
+  } finally { cx.remove(); }
+}
+let shotUrl = "";
+async function compartilhar(alvo, nome){
+  const m = $("shot-modal"), st = $("shot-st"), img = $("shot-img"), env = $("shot-env"), bx = $("shot-bx");
+  m.hidden = false; img.hidden = true; env.hidden = true; bx.hidden = true; st.hidden = false; st.textContent = "Gerando imagem…";
+  try {
+    const blob = await gerarImagem(alvo, nome);
+    const z = n => String(n).padStart(2, "0"), d = new Date();
+    const arq = `apuracao-${slug(nome || "painel") || "painel"}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.jpg`;
+    const file = new File([blob], arq, { type: "image/jpeg" });
+    if (shotUrl) URL.revokeObjectURL(shotUrl); shotUrl = URL.createObjectURL(blob);
+    img.src = shotUrl; img.hidden = false; st.hidden = true;
+    bx.href = shotUrl; bx.download = arq; bx.hidden = false;
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      env.hidden = false;
+      env.onclick = async () => { try { await navigator.share({ files: [file], title: $("titulo").textContent }); } catch (e) { if (e.name !== "AbortError") { st.hidden = false; st.textContent = "Não foi possível abrir o compartilhamento; use “Baixar JPG” ou segure a imagem."; } } };
+    }
+  } catch (e) { st.hidden = false; st.textContent = "Não consegui gerar a imagem (" + (e && e.message || e) + ")."; }
+}
+document.addEventListener("click", e => {
+  if (e.target.closest("#shot-x") || e.target.id === "shot-modal") { $("shot-modal").hidden = true; return; }
+  if (e.target.closest("#share")) { const f = foco(); compartilhar($("grid"), f ? f[0] : "Brasil"); return; }
+  const b = e.target.closest("[data-shr]"); if (!b) return;
+  const card = b.closest(".card"), h = card.querySelector("h2");
+  compartilhar(card, (h ? h.textContent : "") + (card.classList.contains("mapa") && foco() ? " · " + foco()[0] : ""));
+});
+
 const hist = [];
 function seg(h){ const m = /(\d\d):(\d\d):(\d\d)\s*$/.exec(h); return m ? m[1]*3600 + m[2]*60 + +m[3] : null; }
 function registrar(hora){
