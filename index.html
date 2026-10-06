@@ -49,6 +49,11 @@ button:disabled{opacity:.55;cursor:default}
 .nac .mapbox svg.tem .rg{opacity:.4}
 .nac .mapbox svg.tem .rg.ativo{opacity:1;transform:scale(1.07);filter:drop-shadow(0 3px 7px rgba(0,0,0,.4))}
 @media (prefers-reduced-motion:reduce){.nac .rg{transition:none}.nac .mapbox svg.tem .rg.ativo{transform:none}}
+.mapa:not(.nac) .mapbox svg{overflow:visible}
+.mapa:not(.nac) .mapbox path[data-uf]{transition:transform .22s ease,opacity .22s ease;transform-box:fill-box;transform-origin:center;cursor:pointer}
+.mapa:not(.nac) .mapbox svg.tem path[data-uf]{opacity:.4}
+.mapa:not(.nac) .mapbox svg.tem path[data-uf].ativo{opacity:1;transform:scale(1.08);filter:drop-shadow(0 3px 7px rgba(0,0,0,.4))}
+@media (prefers-reduced-motion:reduce){.mapa:not(.nac) .mapbox path[data-uf]{transition:none}.mapa:not(.nac) .mapbox svg.tem path[data-uf].ativo{transform:none}}
 .mapa line{stroke:var(--muted);stroke-width:1;vector-effect:non-scaling-stroke}
 .rot{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none;font-size:12px;line-height:1.1;text-align:center;
   color:#fff;text-shadow:0 0 2px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.6)}
@@ -645,8 +650,25 @@ function destacarReg(g){
   if (g) { svg.appendChild(g); g.classList.add("ativo"); svg.classList.add("tem"); if (dica) dica.textContent = g.dataset.nome + (comMouse() ? " · clique para abrir" : ""); }
   else { svg.classList.remove("tem"); if (dica) dica.textContent = "toque numa região para abrir"; }
 }
+// Mapa da região: mesmo destaque, por estado
+const SEL_UF = ".mapa:not(.nac) .mapbox path[data-uf]";
+let tUf = 0;
+function destacarUf(p){
+  const svg = document.querySelector(".mapa:not(.nac) .mapbox svg"); if (!svg) return;
+  svg.querySelectorAll("path.ativo").forEach(x => x.classList.remove("ativo"));
+  if (!p) { svg.classList.remove("tem"); return; }
+  const antes = svg.querySelector(":scope > :not(path[data-uf])");   // estados ficam antes das linhas dos rótulos
+  svg.insertBefore(p, antes);
+  // estado contido em outro (ex.: DF dentro de GO) volta para cima, senão ficaria coberto
+  const b = (MAPA[p.dataset.uf] || {}).b;
+  if (b) svg.querySelectorAll("path[data-uf]").forEach(o => { const c = (MAPA[o.dataset.uf] || {}).b; if (o !== p && c && c[0] >= b[0] && c[1] >= b[1] && c[2] <= b[2] && c[3] <= b[3]) svg.insertBefore(o, antes); });
+  p.classList.add("ativo"); svg.classList.add("tem");
+}
 document.addEventListener("mouseover", e => {
   if (!comMouse()) return;
+  const u = e.target.closest ? e.target.closest(SEL_UF) : null;
+  if (u) { if (!u.classList.contains("ativo")) destacarUf(u); }
+  else if (document.querySelector(SEL_UF + ".ativo")) destacarUf(null);
   const g = e.target.closest ? e.target.closest(".nac .rg") : null;
   if (g) { if (!g.classList.contains("ativo")) destacarReg(g); }
   else if (document.querySelector(".nac .rg.ativo")) destacarReg(null);
@@ -661,6 +683,10 @@ document.addEventListener("click", e => {
   if (b.dataset.voltar) { history.replaceState(null, "", location.pathname + location.search); desenhar(); window.scrollTo(0, 0); return; }
   const g = b.closest(".nac .rg");
   if (g && !comMouse()) { destacarReg(g); setTimeout(() => navegar(b.dataset.reg), 420); return; }   // no toque: destaca a região e só então abre
+  if (b.matches(SEL_UF) && !comMouse()) {   // no toque: destaca o estado, desce até o cartão dele e depois solta o destaque
+    destacarUf(b); clearTimeout(tUf); const uf = b.dataset.uf;
+    setTimeout(() => navegar(null, uf), 420); tUf = setTimeout(() => destacarUf(null), 1800); return;
+  }
   navegar(b.dataset.reg, g ? null : b.dataset.uf);   // no mapa do Brasil abre a região, não o estado
 });
 window.addEventListener("hashchange", () => { desenhar(); if (alvoUf) setTimeout(focarUf, 60); });
