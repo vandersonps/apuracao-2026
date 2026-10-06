@@ -649,8 +649,18 @@ function carregarH2C(){
   if (window.html2canvas) return Promise.resolve();
   return h2cP = h2cP || new Promise((ok, erro) => { const s = document.createElement("script"); s.src = CFG.h2c; s.onload = ok; s.onerror = () => { h2cP = null; erro(new Error("não consegui baixar o gerador de imagem")); }; document.head.appendChild(s); });
 }
-const corsCache = {};
-const corsOk = src => corsCache[src] = corsCache[src] || new Promise(r => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => r(true); i.onerror = () => r(false); i.src = src; setTimeout(() => r(false), 6000); });
+const fotoCache = {};
+// Baixa a foto de novo pedindo permissão de uso (CORS) e ignorando a cópia em cache, que veio sem essa permissão.
+const fotoData = src => fotoCache[src] = fotoCache[src] || (async () => {
+  for (const cache of ["reload", "no-store"]) {
+    try {
+      const r = await fetch(src, { mode: "cors", cache }); if (!r.ok) continue;
+      const b = await r.blob(); if (!/^image\//.test(b.type) && b.size < 200) continue;
+      return await new Promise((ok, erro) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = erro; fr.readAsDataURL(b); });
+    } catch (e) {}
+  }
+  return "";
+})();
 async function gerarImagem(alvo, nome){
   await carregarH2C();
   const cs = getComputedStyle(document.documentElement), bg = cs.getPropertyValue("--bg").trim() || "#fff";
@@ -667,9 +677,10 @@ async function gerarImagem(alvo, nome){
     cx.querySelectorAll(".tem,.ativo,.foco").forEach(x => x.classList.remove("tem", "ativo", "foco"));
     cx.querySelectorAll(".nac .ufs").forEach(x => { x.textContent = ""; });
     cx.querySelectorAll(".sec span").forEach(x => { if (/toque/.test(x.textContent)) x.textContent = ""; });
-    // fotos: só entram se o TSE permitir o uso em imagem (CORS); senão ficam as iniciais
+    // fotos: entram como cópia embutida; se o TSE não liberar o uso (CORS), ficam as iniciais
     await Promise.all([...cx.querySelectorAll("img.photo")].map(async im => {
-      if (await corsOk(im.src)) { const n = im.cloneNode(); n.crossOrigin = "anonymous"; await new Promise(r => { n.onload = n.onerror = r; n.src = im.src; }); im.replaceWith(n); }
+      const dado = im.src ? await fotoData(im.src) : "";
+      if (dado) { const n = document.createElement("img"); n.className = "photo"; n.alt = ""; await new Promise(r => { n.onload = n.onerror = r; n.src = dado; }); im.replaceWith(n); }
       else { const d = document.createElement("div"); d.className = "ini"; d.textContent = im.dataset.ini || "?"; im.replaceWith(d); }
     }));
     // mapas: fixa no próprio SVG as cores e traços que vêm do CSS (a imagem do SVG não enxerga a folha de estilos)
