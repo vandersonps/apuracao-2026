@@ -68,6 +68,7 @@ button:disabled{opacity:.55;cursor:default}
 .gl{display:grid;grid-template-columns:28px auto 1fr;gap:8px;align-items:center;font-size:.82rem;padding:5px 0;border-top:1px solid var(--line);cursor:pointer}
 .gl span{min-width:0;overflow-wrap:anywhere}
 .sec + .gl{border-top:0;padding-top:0}
+#ano{font:inherit;font-weight:600;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 8px}
 .turnos{display:inline-flex}
 .turnos button{border-radius:0;padding:7px 10px;font-weight:600;color:var(--muted)}
 .turnos button:first-child{border-radius:8px 0 0 8px}
@@ -146,6 +147,7 @@ td.r,th.r{text-align:right}
       <span id="next"></span>
       <button id="refresh" type="button">Atualizar agora</button>
       <button id="share" type="button">Compartilhar</button>
+      <select id="ano" aria-label="Ano da eleição" title="Ano da eleição"></select>
       <span class="turnos" role="group" aria-label="Turno"><button type="button" id="turno1" data-turno="1">1º turno</button><button type="button" id="turno2" data-turno="2">2º turno</button></span>
     </div>
   </header>
@@ -192,6 +194,20 @@ const REGIOES = [
 const EL = { ciclo: "ele2026", fonte: "reserva", semPres: false,
   fed: { 1: { cd: CFG.eleicao, dt: null }, 2: { cd: CFG.eleicao2, dt: null } },
   uf:  { 1: { cd: CFG.eleicaoUf, dt: null }, 2: { cd: CFG.eleicaoUf2, dt: null } } };
+/* Eleições presidenciais por ano. As do calendário do TSE entram sozinhas (2030, 2034…) e ficam guardadas no navegador,
+   porque o calendário só lista os pleitos recentes. As passadas abaixo são fatos consumados e servem de ponto de partida. */
+const HIST = {
+  "2022": { ciclo: "ele2022", fed: { 1: { cd: "544", dt: "2022-10-02" }, 2: { cd: "545", dt: "2022-10-30" } }, uf: { 1: { cd: "546", dt: "2022-10-02" }, 2: { cd: "547", dt: "2022-10-30" } } },
+  "2026": { ciclo: "ele2026", fed: { 1: { cd: CFG.eleicao, dt: "2026-10-04" }, 2: { cd: CFG.eleicao2, dt: null } }, uf: { 1: { cd: CFG.eleicaoUf, dt: "2026-10-04" }, 2: { cd: CFG.eleicaoUf2, dt: null } }, fmt: "u" }
+};
+const ELS = JSON.parse(JSON.stringify(HIST)); let anoSel = "";
+try { const g = JSON.parse(localStorage.getItem("apuracao.els") || "{}"); for (const k in g) if (/^\d{4}$/.test(k) && g[k] && g[k].ciclo && g[k].fed && g[k].fed[1]) ELS[k] = g[k]; } catch (e) {}
+const guardarEls = () => { try { localStorage.setItem("apuracao.els", JSON.stringify(ELS)); } catch (e) {} };
+const anos = () => Object.keys(ELS).sort().reverse();
+function aplicarAno(a){
+  const e = ELS[a] || ELS[anos()[0]]; anoSel = ELS[a] ? a : anos()[0];
+  EL.ciclo = e.ciclo; EL.fed = e.fed; EL.uf = e.uf || {}; EL.fmt = e.fmt || ""; EL.ufOk = {}; EL.semPres = false;
+}
 const hojeBrasilia = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
 const isoData = s => { const m = /(\d\d)\/(\d\d)\/(\d{4})/.exec(s || ""); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 const brData = s => s ? s.split("-").reverse().join("/") : "";
@@ -205,11 +221,11 @@ async function lerConfig(){
   const par = (e, dt) => { const o = { 1: { cd: String(e.cd), dt } }; if (e.cdt2) o[2] = { cd: String(e.cdt2), dt: dataDe(e.cdt2) }; return o; };
   // O calendário acumula pleitos de vários anos (ordinários, suplementares, consultas). Vale a eleição de presidente
   // mais recente; a de governador é a que está no MESMO pleito (isso descarta suplementares, como a de um só estado).
-  let pres = null;
+  const porAno = {};   // ano -> eleição de presidente (1º turno) mais recente daquele ano
   for (const p of pleitos) for (const e of p.e || []) {
     n++;
-    const dt = isoData(p.dt);
-    if (+e.t !== 2 && tem(e, +CFG.cargo, /^presidente/i) && (!pres || (dt || "") > (pres.dt || ""))) pres = { p, e, dt };
+    const dt = isoData(p.dt), ano = dt ? dt.slice(0, 4) : "";
+    if (ano && +e.t !== 2 && tem(e, +CFG.cargo, /^presidente/i) && (!porAno[ano] || dt > porAno[ano].dt)) porAno[ano] = { p, e, dt };
   }
   if (!n) throw new Error("calendário do TSE em formato inesperado");
   // Resumo do calendário para conferência (aparece com #diag no endereço)
@@ -217,17 +233,17 @@ async function lerConfig(){
     const abr = (e.abr || []).map(a => a.cd), cg = [...new Set((e.abr || []).flatMap(a => (a.cp || []).map(c => `${c.cd}=${c.ds}`)))];
     return `pleito ${p.cd} ${p.dt || ""} | eleição ${e.cd} | turno ${e.t} | tipo ${e.tp} | 2ºT ${e.cdt2 || "-"} | ${e.nm || ""} | abrangências(${abr.length}): ${abr.slice(0, 6).join(",")}${abr.length > 6 ? "…" : ""} | cargos: ${cg.join(", ")}`;
   })));
-  let fed = {}, uf = {};
-  if (pres) {
-    fed = par(pres.e, pres.dt);
+  for (const ano in porAno) {
+    const pres = porAno[ano], fed = par(pres.e, pres.dt), ant = ELS[ano] || {}; let uf = {};
     const est = (pres.p.e || []).find(e => +e.t !== 2 && tem(e, +CFG.cargoGov, /^governador/i));
     if (est) uf = par(est, pres.dt);
     // Sem a estadual no mesmo pleito: no TSE ela vem logo após a federal (ex.: 6257/6258 -> 6259/6260).
     else if (/^\d+$/.test(fed[1].cd)) { uf[1] = { cd: String(+fed[1].cd + 2), dt: pres.dt }; uf[2] = { cd: String(+fed[1].cd + 3), dt: fed[2] ? fed[2].dt : null }; }
-    // Ciclo (pasta dos dados): o do arquivo, se vier; senão o ano do pleito (ele2026, ele2030…).
-    EL.ciclo = /^ele\d{4}/.test(j.c || "") ? j.c : pres.dt ? "ele" + pres.dt.slice(0, 4) : EL.ciclo;
+    // data do 2º turno já conhecida não se perde se o calendário ainda (ou já) não a trouxer
+    for (const [novo, velho] of [[fed, ant.fed], [uf, ant.uf]]) if (novo[2] && !novo[2].dt && velho && velho[2] && velho[2].cd === novo[2].cd) novo[2].dt = velho[2].dt;
+    ELS[ano] = { ciclo: /^ele\d{4}/.test(j.c || "") && Object.keys(porAno).length === 1 ? j.c : "ele" + ano, fed, uf, fmt: ant.fmt || "" };
   }
-  EL.fonte = "tse"; EL.semPres = !pres; EL.fed = fed; EL.uf = uf; EL.ufOk = {};
+  EL.fonte = "tse"; guardarEls();
 }
 const base = () => `${CFG.raiz}/${EL.ciclo}`;
 const anoEl = () => (/\d{4}/.exec(EL.ciclo) || [""])[0];
@@ -240,9 +256,20 @@ function codigosGov(t, uf){   // 1º o que já funcionou, depois o do calendári
   const f1 = (EL.fed[1] || {}).cd, viz = /^\d+$/.test(f1 || "") ? String(+f1 + (t === 2 ? 3 : 2)) : "";
   return [...new Set([EL.ufOk && EL.ufOk[t], elUf(t), viz].filter(Boolean))];
 }
-const urlDados = uf => `${base()}/${elFed()}/dados/${uf}/${uf}-c${CFG.cargo}-e${elFed().padStart(6, "0")}-u.json`;
+const arq = (el, uf, cargo, fmt) => fmt === "r" ? `${base()}/${el}/dados-simplificados/${uf}/${uf}-c${cargo}-e${el.padStart(6, "0")}-r.json` : `${base()}/${el}/dados/${uf}/${uf}-c${cargo}-e${el.padStart(6, "0")}-u.json`;
+const urlDados = (uf, fmt) => arq(elFed(), uf, CFG.cargo, fmt);
+// Baixa tentando o formato atual e, se não existir, o de eleições antigas; lembra qual serviu para aquele ano.
+async function buscar(url){
+  let ult = new Error("HTTP 404");
+  for (const fmt of (EL.fmt ? [EL.fmt] : ["u", "r"])) {
+    const r = await fetch(url(fmt), { cache: "no-cache" });
+    if (r.ok) { const d = parse(await r.json()); if (!EL.fmt) { EL.fmt = fmt; if (ELS[anoSel]) { ELS[anoSel].fmt = fmt; guardarEls(); } } return d; }
+    ult = new Error("HTTP " + r.status); if (r.status !== 403 && r.status !== 404) break;
+  }
+  throw ult;
+}
 const fotosPres = () => `${base()}/${elFed()}/fotos/br`;
-const urlGov = (el, uf) => `${base()}/${el}/dados/${uf}/${uf}-c${CFG.cargoGov}-e${el.padStart(6, "0")}-u.json`;
+const urlGov = (el, uf, fmt) => arq(el, uf, CFG.cargoGov, fmt);
 const fotosGov = (el, uf) => `${base()}/${el}/fotos/${uf}`;
 /* Diagnóstico (#diag): sonda os arquivos do TSE que podem trazer resultado por município e mostra a estrutura de cada um. */
 function esboco(v, nivel, pre){
@@ -297,12 +324,47 @@ async function diagMunicipios(pre){
   else out("\n(não achei o código de um município na lista; sem teste de arquivo municipal)\n");
   out("\n===== FIM DA SONDAGEM =====\n");
 }
+// Diagnóstico (#diag): sonda onde o TSE guarda (se ainda guarda) os arquivos de eleições antigas.
+let diagAntRodou = false;
+async function diagAntigas(pre){
+  if (diagAntRodou) return; diagAntRodou = true;
+  const out = t => { pre.textContent += t; }, R = CFG.raiz;
+  out("\n\n===== SONDAGEM DE ELEIÇÕES ANTIGAS =====\n");
+  const alvos = [
+    ["2022 presidente 1ºT, simplificado BR", `${R}/ele2022/544/dados-simplificados/br/br-c0001-e000544-r.json`],
+    ["2022 presidente 1ºT, simplificado SP", `${R}/ele2022/544/dados-simplificados/sp/sp-c0001-e000544-r.json`],
+    ["2022 presidente 2ºT, simplificado BR", `${R}/ele2022/545/dados-simplificados/br/br-c0001-e000545-r.json`],
+    ["2022 presidente 1ºT, dados -v", `${R}/ele2022/544/dados/br/br-c0001-e000544-v.json`],
+    ["2022 presidente 1ºT, dados -f", `${R}/ele2022/544/dados/br/br-c0001-e000544-f.json`],
+    ["2022 presidente 1ºT, dados -u", `${R}/ele2022/544/dados/br/br-c0001-e000544-u.json`],
+    ["2022 lista de municípios", `${R}/ele2022/544/config/mun-e000544-cm.json`],
+    ["2022 calendário do ciclo", `${R}/ele2022/config/ele-c.json`],
+    ["2022 governador SP 1ºT, simplificado", `${R}/ele2022/546/dados-simplificados/sp/sp-c0003-e000546-r.json`],
+    ["2022 foto (pasta)", `${R}/ele2022/544/fotos/br/280001607829.jpeg`],
+    ["2024 prefeito SP capital (-u)", `${R}/ele2024/619/dados/sp/sp71072-c0011-e000619-u.json`],
+    ["2024 lista de municípios", `${R}/ele2024/619/config/mun-e000619-cm.json`],
+    ["2024 calendário do ciclo", `${R}/ele2024/config/ele-c.json`],
+    ["2026 calendário do ciclo", `${R}/ele2026/config/ele-c.json`]
+  ];
+  for (const [rotulo, url] of alvos) {
+    try {
+      const r = await fetch(url, { cache: "no-cache" });
+      if (!r.ok) { out(`\n[${r.status}] ${rotulo}\n   ${url.replace(R, "")}\n`); continue; }
+      const b = await r.blob(); let j = null; if (/json/.test(b.type) || /\.json$/.test(url)) { try { j = JSON.parse(await b.text()); } catch (e) {} }
+      out(`\n[200] ${rotulo} · ${Math.round(b.size / 1024)} KB\n   ${url.replace(R, "")}\n`);
+      if (j) out(esboco(j, 3, "   | ").split("\n").slice(0, 45).join("\n") + "\n");
+    } catch (e) { out(`\n[erro] ${rotulo}: ${e.message}\n   ${url.replace(R, "")}\n`); }
+  }
+  out("\n===== FIM DA SONDAGEM =====\n");
+}
 function mostrarCalendario(){
   if (location.hash === "#diag") {
     let pre = $("diag"); if (!pre) { pre = document.createElement("pre"); pre.id = "diag"; pre.style.cssText = "white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5;margin:12px 0;padding:12px;border:1px solid var(--line,#ccc);border-radius:8px;user-select:text;-webkit-user-select:text"; $("grid").before(pre); }
-    pre.textContent = "Calendário do TSE (" + CFG.raiz + "/" + CFG.config + ")\n\n" + (EL.diag ? EL.diag.join("\n\n") : "não foi lido") + "\n\nEscolhido: ciclo " + EL.ciclo + " · presidente " + JSON.stringify(EL.fed) + " · governador " + JSON.stringify(EL.uf) + "\n\nGovernador em uso: 1ºT " + (EL.ufOk && EL.ufOk[1] || "ainda não consultado") + " · 2ºT " + (EL.ufOk && EL.ufOk[2] || "ainda não consultado");
+    pre.textContent = "Calendário do TSE (" + CFG.raiz + "/" + CFG.config + ")\n\n" + (EL.diag ? EL.diag.join("\n\n") : "não foi lido") + "\n\nAnos conhecidos: " + JSON.stringify(ELS) + "\n\nEscolhido: ano " + anoSel + " · formato " + (EL.fmt || "?") + " · ciclo " + EL.ciclo + " · presidente " + JSON.stringify(EL.fed) + " · governador " + JSON.stringify(EL.uf) + "\n\nGovernador em uso: 1ºT " + (EL.ufOk && EL.ufOk[1] || "ainda não consultado") + " · 2ºT " + (EL.ufOk && EL.ufOk[2] || "ainda não consultado");
+    diagAntigas(pre);
   }
   const a = anoEl();
+  $("ano").innerHTML = anos().map(x => `<option value="${x}"${x === anoSel ? " selected" : ""}>${x}</option>`).join("");
   $("titulo").textContent = `Apuração para Presidente ${a} por Região`; document.title = `Apuração Presidente ${a} por Região`;
   const t = n => EL.fed[n] ? `${n}º turno${EL.fed[n].dt ? " em " + brData(EL.fed[n].dt) : ""}` : "";
   $("cal").textContent = EL.fonte === "tse"
@@ -332,7 +394,7 @@ function candidatos(node, sg, out){
       id: String(node.sqcand || node.n || node.nmu || node.nm),
       sq: node.sqcand ? String(node.sqcand) : "",
       nome: fixNome(node.nmu || node.nm), num: node.n ? String(node.n) : "",
-      partido: sg || "", votos: num(node.vap), sit: typeof node.st === "string" ? node.st : ""
+      partido: sg || (typeof node.cc === "string" ? node.cc.split(" - ")[0].trim() : ""), votos: num(node.vap), sit: typeof node.st === "string" ? node.st : ""
     });
     return out;
   }
@@ -340,16 +402,15 @@ function candidatos(node, sg, out){
   return out;
 }
 function parse(j){
-  const s = j.s || {}, e = j.e || {}, v = j.v || {};
+  const plano = j.s != null && typeof j.s !== "object";   // formato simplificado antigo: totais soltos na raiz do arquivo
+  const s = plano ? { ts: j.s, st: j.st } : j.s || {}, e = plano ? { te: j.e, est: j.ea, c: j.c, a: j.a } : j.e || {}, v = plano ? j : j.v || {};
   return { cands: candidatos(j.carg || j, "", []), ts: num(s.ts), st: num(s.st),
            te: num(e.te), est: num(e.est), comp: num(e.c), abst: num(e.a), tv: num(v.tv), vb: num(v.vb), vnul: num(v.tvn),   // eleitorado, comparecimento, abstenção, brancos, nulos
            hora: [j.dg, j.hg].filter(Boolean).join(" ") };
 }
 async function baixar(uf){
   if (!elFed()) throw new Error("HTTP 404");
-  const r = await fetch(urlDados(uf), { cache: "no-cache" });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  return parse(await r.json());
+  return buscar(fmt => urlDados(uf, fmt));
 }
 function somar(lista){
   const m = new Map(); let ts = 0, st = 0; const x = { te: 0, est: 0, comp: 0, abst: 0, tv: 0, vb: 0, vnul: 0 };
@@ -525,7 +586,7 @@ const slug = n => n.toLowerCase().normalize("NFD").replace(/[^a-z-]/g, "");
 const foco = () => REGIOES.find(r => slug(r[0]) === location.hash.slice(1)) || null;
 const gov = {}, govPend = new Set();   // governadores por UF: { d, el, t, erro, fixo }
 async function baixarGov(uf){
-  const tenta = async el => { const r = await fetch(urlGov(el, uf), { cache: "no-cache" }); if (!r.ok) throw new Error("HTTP " + r.status); return parse(await r.json()); };
+  const tenta = el => buscar(fmt => urlGov(el, uf, fmt));
   const varios = async t => {   // tenta os códigos possíveis; guarda o que funcionou para as próximas UFs
     const cods = codigosGov(t, uf); let ult = new Error("HTTP 404");
     for (const el of cods) {
@@ -738,6 +799,21 @@ function marcarTurno(){
   $("turno1").classList.toggle("on", turno === 1); $("turno2").classList.toggle("on", turno === 2);
   if (!hist.length) $("hist").textContent = turno + "º turno · dados oficiais do TSE lidos direto pelo seu navegador";
 }
+// Turno ao abrir um ano: no mais recente segue o calendário; nos anteriores abre o 2º (e cai para o 1º se não houve).
+function turnoInicial(){
+  turnoAuto = true;
+  if (anoSel === anos()[0] && EL.fonte === "tse") return dataTurno2() && hojeBrasilia() >= dataTurno2() ? 2 : 1;
+  return EL.fed[2] ? 2 : 1;
+}
+function trocarAno(a){
+  if (a === anoSel || !ELS[a]) return;
+  if (ocupado) { setTimeout(() => trocarAno(a), 400); return; }
+  aplicarAno(a); turno = turnoInicial(); hist.length = 0; ultimos = null; completo = false; iniciada = false; proxima = 0;
+  for (const k in guardado) delete guardado[k];
+  for (const k in gov) delete gov[k];
+  $("grid").innerHTML = ""; $("alert").hidden = true; mostrarCalendario(); marcarTurno(); atualizar();
+}
+document.addEventListener("change", e => { if (e.target.id === "ano") trocarAno(e.target.value); });
 function trocarTurno(n){
   turnoAuto = false;
   if (n === turno) return;
@@ -755,10 +831,11 @@ let completo = false, iniciada = false, pronto = false;
 const dataTurno = () => (EL.fed[turno] || {}).dt || null;   // dia da eleição do turno em exibição, vindo do calendário do TSE
 const inicioAuto = () => dataTurno() ? Date.parse(dataTurno() + "T" + String(CFG.horaAuto).padStart(2, "0") + ":00:00-03:00") : null;
 // Sem data no calendário, vale o que os próprios dados mostram: liga quando já há seções totalizadas.
-const autoAtivo = () => !completo && !EL.semPres && (inicioAuto() != null ? Date.now() >= inicioAuto() : iniciada);
+const autoAtivo = () => !completo && !EL.semPres && anoSel === anos()[0] && (inicioAuto() != null ? Date.now() >= inicioAuto() : iniciada);
 function textoAuto(){
   if (EL.semPres) return "";
   if (completo) return "Apuração 100% concluída · atualização automática desligada";
+  if (anoSel !== anos()[0]) return "Eleição anterior · sem atualização automática";
   if (!dataTurno()) return "Apuração ainda não começou · atualização automática desligada";
   return `Atualização automática a partir de ${brData(dataTurno())} às ${CFG.horaAuto}h (Brasília)`;
 }
@@ -775,12 +852,12 @@ async function atualizar(manual){
   $("status").innerHTML = `<span class="dot load"></span>Atualizando…`;
   if (!pronto || manual === true || EL.fonte !== "tse") {   // ao abrir a página e no "Atualizar agora": confere o calendário vigente no TSE
     try { await lerConfig(); } catch (e) { /* segue com o que já tinha */ }
-    if (!pronto && EL.fonte === "tse") turno = dataTurno2() && hojeBrasilia() >= dataTurno2() ? 2 : 1;
-    else if (!pronto) turno = 2;   // sem calendário: tenta o 2º turno e, se não houver, cai para o 1º
+    if (!pronto) { aplicarAno(anos()[0]); turno = turnoInicial(); }   // primeiro acesso: eleição mais recente
+    else { const f = EL.fmt; aplicarAno(anoSel); EL.fmt = EL.fmt || f; }
     pronto = true; mostrarCalendario(); marcarTurno();
   }
   if (EL.semPres) {
-    $("alert").hidden = false; $("alert").textContent = `A eleição vigente no TSE (${EL.ciclo}) não tem disputa para presidente. Este painel cobre as eleições gerais (presidente e governadores).`;
+    $("alert").hidden = false; $("alert").textContent = `A eleição selecionada (${EL.ciclo}) não tem disputa para presidente. Este painel cobre as eleições gerais (presidente e governadores).`;
     $("status").innerHTML = `<span class="dot err"></span>Sem dados`; $("next").textContent = ""; proxima = 0;
     $("refresh").disabled = false; ocupado = false; return;
   }
